@@ -19,6 +19,7 @@ void updateConnectionStatus(bool isConnected, uint8_t battery);  // Atualiza BT 
 void showDisconnectingMessage();                        // Mostra mensagem de desconexão do DualSense
 void showLCDOffMessage();                               // Mostra mensagem de desligamento do LCD
 void showRestartingMessage();                           // Mostra mensagem de reinício do sistema
+void updateAllMotorsDisplay(int m1, int m2, int m3, int m4);  // Atualiza display com todos os 4 motores
 void turnOffDisplay();                                  // Desliga o display (apaga backlight e limpa)
 
 #endif // DISPLAY_H

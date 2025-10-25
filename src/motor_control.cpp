@@ -9,27 +9,31 @@
 #include <Arduino.h>
 
 // Instâncias dos motores AccelStepper
-AccelStepper rearMotor(AccelStepper::FULL4WIRE, REAR_IN1, REAR_IN3, REAR_IN2, REAR_IN4);
-AccelStepper frontMotor(AccelStepper::FULL4WIRE, FRONT_IN1, FRONT_IN3, FRONT_IN2, FRONT_IN4);
+AccelStepper motor1(AccelStepper::FULL4WIRE, MOTOR1_IN1, MOTOR1_IN3, MOTOR1_IN2, MOTOR1_IN4); // Motor 1: R2/L2
+AccelStepper motor2(AccelStepper::FULL4WIRE, MOTOR2_IN1, MOTOR2_IN3, MOTOR2_IN2, MOTOR2_IN4); // Motor 2: analógico esquerdo
+AccelStepper motor3(AccelStepper::FULL4WIRE, MOTOR3_IN1, MOTOR3_IN3, MOTOR3_IN2, MOTOR3_IN4); // Motor 3: analógico direito
+AccelStepper motor4(AccelStepper::FULL4WIRE, MOTOR4_IN1, MOTOR4_IN3, MOTOR4_IN2, MOTOR4_IN4); // Motor 4: L1/R1
 
 // Variáveis globais
-int currentSpeed = 0;
-int steeringSpeed = 0;
+int motor1Speed = 0;
+int motor2Speed = 0;
+int motor3Speed = 0;
+int motor4Speed = 0;
 
 /**
  * Inicializa os motores de passo
  * Configura velocidade máxima e aceleração
  */
 void initMotors() {
-    // Configurar motor traseiro (throttle)
-    rearMotor.setMaxSpeed(1000.0);
-    rearMotor.setAcceleration(500.0);
-    
-    // Configurar motor dianteiro (direção)
-    frontMotor.setMaxSpeed(1000.0);
-    frontMotor.setAcceleration(500.0);
-    
-    Serial.println("Motores inicializados!");
+  motor1.setMaxSpeed(1000.0);
+  motor1.setAcceleration(500.0);
+  motor2.setMaxSpeed(1000.0);
+  motor2.setAcceleration(500.0);
+  motor3.setMaxSpeed(1000.0);
+  motor3.setAcceleration(500.0);
+  motor4.setMaxSpeed(1000.0);
+  motor4.setAcceleration(500.0);
+  Serial.println("Motores inicializados!");
 }
 
 /**
@@ -37,22 +41,15 @@ void initMotors() {
  * R2 = frente, L2 = ré
  * Mapeia a pressão (0-255) para velocidade proporcional
  */
-void controlThrottle(int r2Pressure, int l2Pressure) {
-    if (r2Pressure > 0) {
-        // Acelerar para frente
-        currentSpeed = map(r2Pressure, 0, 255, 0, MAX_SPEED_THROTTLE);
-    } else if (l2Pressure > 0) {
-        // Acelerar para trás (velocidade negativa)
-        currentSpeed = -map(l2Pressure, 0, 255, 0, MAX_SPEED_THROTTLE);
-    } else {
-        // Sem aceleração
-        currentSpeed = 0;
-    }
-    
-    // Aplicar velocidade ao motor traseiro (com proteção)
-    if (rearMotor.maxSpeed() > 0) {
-        rearMotor.setSpeed(currentSpeed);
-    }
+void controlMotor1(int r2Pressure, int l2Pressure) {
+  if (r2Pressure > 0) {
+    motor1Speed = map(r2Pressure, 0, 255, 0, MAX_SPEED_THROTTLE);
+  } else if (l2Pressure > 0) {
+    motor1Speed = -map(l2Pressure, 0, 255, 0, MAX_SPEED_THROTTLE);
+  } else {
+    motor1Speed = 0;
+  }
+  motor1.setSpeed(motor1Speed);
 }
 
 /**
@@ -60,28 +57,43 @@ void controlThrottle(int r2Pressure, int l2Pressure) {
  * Esquerda = negativo, Direita = positivo
  * Inclui zona morta para evitar drift
  */
-void controlSteering(int leftStickX) {
-    int tempSpeed;
-    
-    if (leftStickX < 0) {
-        // Virar para esquerda
-        tempSpeed = -map(abs(leftStickX), 0, 128, 0, MAX_SPEED_STEERING);
-    } else {
-        // Virar para direita
-        tempSpeed = map(leftStickX, 0, 127, 0, MAX_SPEED_STEERING);
-    }
-    
-    // Aplicar zona morta (deadzone)
-    if (abs(leftStickX) < ANALOG_DEADZONE) {
-        tempSpeed = 0;
-    }
-    
-    steeringSpeed = tempSpeed;
-    
-    // Aplicar velocidade ao motor dianteiro (com proteção)
-    if (frontMotor.maxSpeed() > 0) {
-        frontMotor.setSpeed(steeringSpeed);
-    }
+void controlMotor2(int leftStickX) {
+  int tempSpeed;
+  if (leftStickX < 0) {
+    tempSpeed = -map(abs(leftStickX), 0, 128, 0, MAX_SPEED_STEERING);
+  } else {
+    tempSpeed = map(leftStickX, 0, 127, 0, MAX_SPEED_STEERING);
+  }
+  if (abs(leftStickX) < ANALOG_DEADZONE) {
+    tempSpeed = 0;
+  }
+  motor2Speed = tempSpeed;
+  motor2.setSpeed(motor2Speed);
+}
+
+void controlMotor3(int rightStickX) {
+  int tempSpeed;
+  if (rightStickX < 0) {
+    tempSpeed = -map(abs(rightStickX), 0, 128, 0, MAX_SPEED_STEERING);
+  } else {
+    tempSpeed = map(rightStickX, 0, 127, 0, MAX_SPEED_STEERING);
+  }
+  if (abs(rightStickX) < ANALOG_DEADZONE) {
+    tempSpeed = 0;
+  }
+  motor3Speed = tempSpeed;
+  motor3.setSpeed(motor3Speed);
+}
+
+void controlMotor4(bool l1, bool r1) {
+  if (l1 && !r1) {
+    motor4Speed = MAX_SPEED_THROTTLE;
+  } else if (r1 && !l1) {
+    motor4Speed = -MAX_SPEED_THROTTLE;
+  } else {
+    motor4Speed = 0;
+  }
+  motor4.setSpeed(motor4Speed);
 }
 
 /**
@@ -89,6 +101,8 @@ void controlSteering(int leftStickX) {
  * Deve ser chamado continuamente no loop principal
  */
 void runMotors() {
-    rearMotor.runSpeed();
-    frontMotor.runSpeed();
+  motor1.runSpeed();
+  motor2.runSpeed();
+  motor3.runSpeed();
+  motor4.runSpeed();
 }

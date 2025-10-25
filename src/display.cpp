@@ -15,9 +15,15 @@ LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
  * Inicializa o display LCD
  */
 void initDisplay() {
+    // Inicializar I2C com pinos customizados
+    Wire.begin(LCD_SDA, LCD_SCL);
+    
     lcd.init();
     lcd.backlight();
-    Serial.println("Display LCD inicializado!");
+    Serial.print("Display LCD inicializado nos pinos SDA:");
+    Serial.print(LCD_SDA);
+    Serial.print(" SCL:");
+    Serial.println(LCD_SCL);
 }
 
 /**
@@ -26,65 +32,64 @@ void initDisplay() {
 void showWaitingMessage() {
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("Waiting for");
+    lcd.print("4-Motor Controller");
     lcd.setCursor(0, 1);
-    lcd.print("controller...");
+    lcd.print("Waiting for");
+    lcd.setCursor(0, 2);
+    lcd.print("DualSense...");
+    lcd.setCursor(0, 3);
+    lcd.print("MAC: Last 6 digits");
 }
 
 /**
- * Atualiza o display com status de throttle e direção
- * Linha 1: Status do throttle (T:FWD/BWD/STOP + %)
- * Linha 2: Status da direção (S:L/R/CENTER + velocidade) + Bateria
- * 
- * Otimizado para atualizar apenas quando houver mudança significativa
+ * Atualiza o display com status dos 4 motores
+ * LCD 20x4 - Uma linha para cada motor
+ * Linha 1: Motor 1 (R2/L2)
+ * Linha 2: Motor 2 (Analog Left)
+ * Linha 3: Motor 3 (Analog Right)  
+ * Linha 4: Motor 4 (L1/R1) + Bateria
  */
-void updateDisplay(int speed, int steering, int r2, int l2) {
-    static int lastSpeed = 999999;
-    static int lastSteering = 999999;
+void updateDisplay(int motor1Speed, int motor2Speed, int r2, int l2) {
+    static int lastM1 = 999999;
+    static int lastM2 = 999999;
     static unsigned long lastUpdate = 0;
     unsigned long currentTime = millis();
     
-    // Atualizar apenas a cada intervalo definido ou quando houver mudança significativa
+    // Atualizar a cada intervalo ou mudança significativa
     if ((currentTime - lastUpdate > LCD_UPDATE_INTERVAL) && 
-        (abs(speed - lastSpeed) > LCD_UPDATE_THRESHOLD || 
-         abs(steering - lastSteering) > LCD_UPDATE_THRESHOLD)) {
+        (abs(motor1Speed - lastM1) > LCD_UPDATE_THRESHOLD || 
+         abs(motor2Speed - lastM2) > LCD_UPDATE_THRESHOLD)) {
         
-        lcd.clear();
-        
-        // Linha 1: Status do throttle
+        // Linha 1: Motor 1 (R2/L2)
         lcd.setCursor(0, 0);
-        if (speed > 0) {
-            lcd.print("T:FWD ");
-            int percent = map(r2, 0, 255, 0, 100);
-            if (percent < 10) lcd.print(" ");
-            lcd.print(percent);
-            lcd.print("%");
-        } else if (speed < 0) {
-            lcd.print("T:BWD ");
-            int percent = map(l2, 0, 255, 0, 100);
-            if (percent < 10) lcd.print(" ");
-            lcd.print(percent);
-            lcd.print("%");
+        lcd.print("M1(R2/L2): ");
+        if (motor1Speed > 0) {
+            lcd.print("FWD ");
+            lcd.print(abs(motor1Speed));
+        } else if (motor1Speed < 0) {
+            lcd.print("BWD ");
+            lcd.print(abs(motor1Speed));
         } else {
-            lcd.print("T:STOP");
+            lcd.print("STOP    ");
         }
         
-        // Linha 2: Status da direção (primeiras 10 colunas, deixa espaço para bateria)
+        // Linha 2: Motor 2 (Analógico Esquerdo)
         lcd.setCursor(0, 1);
-        if (abs(steering) > 10) {
-            lcd.print("S:");
-            lcd.print(steering < 0 ? "L" : "R");
-            lcd.print(" ");
-            // Limitar steering para não ocupar muito espaço
-            int steerDisplay = abs(steering);
-            if (steerDisplay > 999) steerDisplay = 999;
-            lcd.print(steerDisplay);
+        lcd.print("M2(LS): ");
+        if (motor2Speed > 0) {
+            lcd.print("R ");
+            lcd.print(motor2Speed);
+            lcd.print("     ");
+        } else if (motor2Speed < 0) {
+            lcd.print("L ");
+            lcd.print(abs(motor2Speed));
+            lcd.print("     ");
         } else {
-            lcd.print("S:CENTER");
+            lcd.print("CENTER   ");
         }
         
-        lastSpeed = speed;
-        lastSteering = steering;
+        lastM1 = motor1Speed;
+        lastM2 = motor2Speed;
         lastUpdate = currentTime;
     }
 }
@@ -143,6 +148,82 @@ void showRestartingMessage() {
     lcd.print("Restarting");
     lcd.setCursor(0, 1);
     lcd.print("system...");
+}
+
+/**
+ * Atualiza display com todos os 4 motores (LCD 20x4)
+ */
+void updateAllMotorsDisplay(int m1, int m2, int m3, int m4) {
+    static int lastM1 = 999999, lastM2 = 999999, lastM3 = 999999, lastM4 = 999999;
+    static unsigned long lastUpdate = 0;
+    unsigned long currentTime = millis();
+    
+    // Atualizar apenas se houver mudança significativa
+    if ((currentTime - lastUpdate > LCD_UPDATE_INTERVAL) && 
+        (abs(m1 - lastM1) > LCD_UPDATE_THRESHOLD || 
+         abs(m2 - lastM2) > LCD_UPDATE_THRESHOLD ||
+         abs(m3 - lastM3) > LCD_UPDATE_THRESHOLD ||
+         abs(m4 - lastM4) > LCD_UPDATE_THRESHOLD)) {
+        
+        // Linha 1: Motor 1 (R2/L2)
+        lcd.setCursor(0, 0);
+        lcd.print("M1(R2/L2):");
+        if (m1 > 0) {
+            lcd.print("FWD ");
+            lcd.print(abs(m1));
+        } else if (m1 < 0) {
+            lcd.print("BWD ");
+            lcd.print(abs(m1));
+        } else {
+            lcd.print("STOP   ");
+        }
+        
+        // Linha 2: Motor 2 (Analógico Esquerdo)
+        lcd.setCursor(0, 1);
+        lcd.print("M2(LS):");
+        if (m2 > 0) {
+            lcd.print("R ");
+            lcd.print(m2);
+            lcd.print("      ");
+        } else if (m2 < 0) {
+            lcd.print("L ");
+            lcd.print(abs(m2));
+            lcd.print("      ");
+        } else {
+            lcd.print("CENTER    ");
+        }
+        
+        // Linha 3: Motor 3 (Analógico Direito)
+        lcd.setCursor(0, 2);
+        lcd.print("M3(RS):");
+        if (m3 > 0) {
+            lcd.print("R ");
+            lcd.print(m3);
+            lcd.print("      ");
+        } else if (m3 < 0) {
+            lcd.print("L ");
+            lcd.print(abs(m3));
+            lcd.print("      ");
+        } else {
+            lcd.print("CENTER    ");
+        }
+        
+        // Linha 4: Motor 4 (L1/R1)
+        lcd.setCursor(0, 3);
+        lcd.print("M4(L1/R1):");
+        if (m4 > 0) {
+            lcd.print("FWD ");
+            lcd.print(abs(m4));
+        } else if (m4 < 0) {
+            lcd.print("BWD ");
+            lcd.print(abs(m4));
+        } else {
+            lcd.print("STOP   ");
+        }
+        
+        lastM1 = m1; lastM2 = m2; lastM3 = m3; lastM4 = m4;
+        lastUpdate = currentTime;
+    }
 }
 
 /**
